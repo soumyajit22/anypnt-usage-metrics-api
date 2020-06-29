@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:aggregators="http://www.mulesoft.org/schema/mule/aggregators"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/aggregators http://www.mulesoft.org/schema/mule/aggregators/current/mule-aggregators.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<sub-flow name="retrieve-env-list-subflow" doc:id="4c6111a1-acf0-4d16-bce5-ffd06da308e1">
+		<flow-ref doc:name="generate-anypnt-access-token-subflow" doc:id="0b876e67-15b4-47be-a0c0-8d0f22629969" name="generate-anypnt-access-token-subflow" target="accessToken" targetValue='#["Bearer " ++ payload.access_token]' />
+		<flow-ref doc:name="get-anypnt-org-details-subflow" doc:id="a38cd0e9-64cb-4066-b854-bb06e826ea9a" name="get-anypnt-org-details-subflow" targetValue="#[payload.user.organizationId]" target="orgId" />
+		<flow-ref doc:name="get-anypnt-envs-list-subflow" doc:id="722c264a-5002-4a44-9c13-af39c7374a52" name="get-anypnt-envs-list-subflow" />
+		<logger level="INFO" doc:name="Logger" doc:id="0fa28e7c-9209-43b3-b76b-6e413e3d1a55" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "Total no of environments in the org #[vars.envList.envCount]"}' />
+		<ee:transform doc:name="list environments" doc:id="a09a5497-2613-45b7-be72-34c9a195894b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0 
+
+output application/json
+---
+{   count : vars.envCount,
+    envs : payload.data map {
+            env : $.name,
+            "type" : $."type"
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+
+</sub-flow>
+	<sub-flow name="retrieve-active-runtime-version-subflow" doc:id="1de11d92-2c2c-4b45-af09-87ec9c26b2ac" >
+		<flow-ref doc:name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="6f579ae2-f859-4745-ab91-38d3c22f22fa" name="retrieve-anypnt-usage-metrics-orchestrator-subflow"/>
+		<ee:transform doc:name="unique versions per environment" doc:id="6c490be9-92d7-48ce-9097-6885c948d5c2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	env: $.envName,
+	runtime: ($.envDetails[?($.status == "STARTED" )]) distinctBy ($.muleVersion.version) map 
+    {
+		mule_ver: $.muleVersion.version,
+		support_endby: $.muleVersion.endOfSupportDate as DateTime {
+			unit : "milliseconds"
+		} as Date
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="retrieve-vcores-subflow" doc:id="7e121a04-f98e-4d56-8c05-405fce7ef65f" >
+		<flow-ref doc:name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="590c675d-f17d-4d94-a23c-a9455e822966" name="retrieve-anypnt-usage-metrics-orchestrator-subflow"/>
+		<ee:transform doc:name="cores per environment" doc:id="be28ccda-694d-45cc-a27e-cd4fa7bc11e1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+
+output application/json
+---
+(payload map {
+    env : $.envName,
+    cores :  ($.envDetails[?($.status == "STARTED" )].workers.'type'.cpu default []) map {a:$ replace " vCores" with ""}.a reduce ($ + $$)
+   
+})[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="send-biz-email-subflow" doc:id="f42576a3-b55e-4063-972e-1f2dc880b255" >
+		<email:send doc:name="Send alert" doc:id="63ed0f9d-e8f0-4e6f-8887-52ac0e0faa44" config-ref="EmailSMTP" fromAddress="${bizEmail.from}" subject="${bizEmail.subject}" toAddresses='#[vars.globalProperties.email splitBy ","]'>
+			<email:body contentType="text/plain">
+				<email:content ><![CDATA[#[%dw 2.0
+output application/java
+---
+"Please find Anypoint platform usage report attached for environments : " ++  ((vars.envList.envName default[]) joinBy ",")]]]></email:content>
+			</email:body>
+			<email:attachments ><![CDATA[#[%dw 2.0
+output application/java
+---
+(vars.attNm) : payload]]]></email:attachments>
+
+			</email:send>	</sub-flow>
+	<sub-flow name="main-orchestrator-subflow" doc:id="6bf09abb-e074-441f-9154-62f47d1d92a8" >
+				<choice doc:name="send a technical response if call has requrested response by email " doc:id="78d82808-2f4d-4e71-ad11-063dccef10a7" >
+			<when expression="#[vars.globalProperties.responseByEmail]">
+				<validation:is-not-blank-string doc:name="Is not blank string" doc:id="de13dda1-c24e-4ed2-b46f-f5b3bcd924c6" value="#[vars.globalProperties.email]" message="#[p('emailid.blank')]"/>
+				<async doc:name="Async" doc:id="915d91dc-7ffe-4d16-b55c-fc9212a2a60f" >
+					<flow-ref doc:name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="babc562a-8d73-4549-abb8-050d5c7d014c" name="retrieve-anypnt-usage-metrics-orchestrator-subflow"/>
+					<flow-ref doc:name="output-formater-subflow" doc:id="365287fd-a474-4c63-95b6-9052e22bd4cf" name="output-formater-subflow" />
+					<flow-ref doc:name="send-biz-email-subflow" doc:id="bc951800-dfa1-433b-8885-7d121c3fe33b" name="send-biz-email-subflow"/>
+				
+</async>
+				<ee:transform doc:name="send a technical acknowledgement" doc:id="d1041eee-f599-487e-a8f2-bb76cfdc755b">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "request accepted"
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+			
+</when>
+			<otherwise >
+				<flow-ref doc:name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="c089f5a3-c1a2-4884-a3d6-458806fa1c57" name="retrieve-anypnt-usage-metrics-orchestrator-subflow"/>
+				<flow-ref doc:name="output-formater-subflow" doc:id="943e23f8-6a9a-452a-9c7a-0d25cfc4aab8" name="output-formater-subflow"/>
+			
+</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="784d5bcf-119f-4eb4-a73c-80ee7e05a502">
+		<flow-ref doc:name="generate-anypnt-access-token-subflow" doc:id="44ea558d-0a15-4a38-bf35-4d9251161968" name="generate-anypnt-access-token-subflow" target="accessToken" targetValue='#["Bearer " ++ payload.access_token]' />
+		<flow-ref doc:name="get-anypnt-org-details-subflow" doc:id="a33bbdc7-e736-4f38-a0ab-943e23047e3d" name="get-anypnt-org-details-subflow" targetValue="#[payload.user.organizationId]" target="orgId" />
+		<flow-ref doc:name="get-anypnt-envs-list-subflow" doc:id="f3207b7d-b391-4e32-9172-5f171b520d80" name="get-anypnt-envs-list-subflow" />
+		<logger level="INFO" doc:name="Logger" doc:id="4b544502-e3b1-4284-a96f-192d9f6e119f" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "Total no of environments in the org #[vars.envCount]"}' />
+		<choice doc:name="choose processing strategy" doc:id="26c4be6c-fc4d-43ea-b140-d4ba475b593d">
+			<when expression="#[vars.globalProperties.processingStrategy == p('processing.strategy.con')]">
+				<flow-ref doc:name="parallel-processing-subflow" doc:id="f9467602-6f20-4bc4-b840-ad1d193bb95c" name="parallel-processing-subflow" />
+			</when>
+			<otherwise>
+				<flow-ref doc:name="sequential-processing-subflow" doc:id="0383ba3c-6c8a-4815-b55e-f0f091a95571" name="sequential-processing-subflow" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="93478066-1984-44e9-a3b0-5f09b022b86a" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "Information of all environments extracted"}' />
+	</sub-flow>
+	<sub-flow name="sequential-processing-subflow" doc:id="f6e3513e-c9db-4d87-ba48-6cbb4191f2b8">
+		<set-variable value="#[[]]" doc:name="Initilize envDetails as Array" doc:id="7d804269-29aa-4bba-a596-e95e3947e017" variableName="envDetails" />
+		<foreach doc:name="For Each" doc:id="b903fd06-722f-4bec-a852-7ac8a127d0b2" collection="#[vars.envList]">
+			<logger level="INFO" doc:name="Logger" doc:id="a264fe3b-1b6b-44b4-baeb-223cd68d552e" message=' {"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start of  environments extraction counter #[vars.counter] "}' />
+			<flow-ref doc:name="get-anypnt-env-details-subflow" doc:id="f3e864f8-3354-4751-a509-9d291c1f6925" name="get-anypnt-env-details-subflow" />
+			<ee:transform doc:name="append response" doc:id="81d23859-f216-40a3-ba0f-667f01490b90">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="envDetails"><![CDATA[%dw 2.0
+var index = vars.counter -1
+output application/json
+---
+vars.envDetails << {
+    
+    envName : vars.envList[index].envName,
+    prod :  vars.envList[index].prod, 
+    envDetails : payload 
+}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="INFO" doc:name="Logger" doc:id="e1bfcc10-3e46-4a9d-8cf9-9a3d23d41dd0" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of  environments extraction counter #[vars.counter] "}' />
+		</foreach>
+		<set-payload value="#[vars.envDetails]" doc:name="Set Payload from envDetails" doc:id="a1d1432a-0ace-4eab-b77a-777faa903ee5" />
+		<remove-variable doc:name="Remove envDetails" doc:id="b1da701d-da26-430a-9eb6-6342747ba7b3" variableName="envDetails" />
+	</sub-flow>
+	<sub-flow name="parallel-processing-subflow" doc:id="183c1de5-52a0-41f6-a2f3-23e58d7238eb" >
+		<logger level="INFO" doc:name="Logger" doc:id="46d318d1-a5c9-44a8-a575-09a21b2cd348" message=' {"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start of  environments extraction "}'/>
+		<foreach doc:name="For Each" doc:id="6de47ccd-1c78-48c8-8dad-9c73dc78dd3b" collection="#[vars.envList]">
+			<async doc:name="Async" doc:id="2872c22e-e181-4ef6-b467-40568a4cfdfc" >
+				<flow-ref doc:name="get-anypnt-env-details-subflow" doc:id="4f2146ec-350d-4b6b-b666-4982036e6a63" name="get-anypnt-env-details-subflow"/>
+				<aggregators:group-based-aggregator doc:name="Group based aggregator" doc:id="967c38ad-fb44-440d-9b9b-55654725feac" name="anypntEnvDetailsAgg" groupId="#['ENVDETAILS-AGGREGATOR-' ++ correlationId]" groupSize="#[vars.envCount]" timeout="${grpAgg.timeout}" evictionTime="${grpAgg.evictionTime}">
+					<aggregators:aggregation-complete >
+						<vm:publish queueName="${vmq.queue}" doc:name="push msgs" doc:id="a4a50f32-d0c1-4c32-8af3-a9227074f8fc" config-ref="VMConfig" timeout="${vmq.timeout}"/>
+					</aggregators:aggregation-complete>
+				</aggregators:group-based-aggregator>
+			
+</async>
+		</foreach>
+		<vm:consume doc:name="receive msg" doc:id="cbd58169-a431-454a-b9d1-c1146ddb621b" queueName="${vmq.queue}" config-ref="VMConfig" timeout="${vmq.timeout}"/>
+		<ee:transform doc:name="append response" doc:id="9c28ec6f-6cdc-44ee-b930-8377b4f572ef" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+vars.envList map {
+        envName : $.envName,
+        prod : $.prod,
+        envDetails : payload[$$]
+
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="f6b3dc4e-1970-4e82-94ff-6825bd7ff342" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of  environments extraction "}'/>
+	
+</sub-flow>
+	
+		<sub-flow name="output-formater-subflow" doc:id="6da1d2a0-bc62-424e-ae8f-840067c67a4e" >
+		<choice doc:name="Transform response to desired format" doc:id="c8f2575c-8dd3-4b5f-8c9d-76423202405d">
+			<when expression="#[vars.globalProperties.outputFormat == p('fileFormat.csv')]">
+				<ee:transform doc:name="Transform to flatfile" doc:id="4e08f57a-ea90-4f13-93b9-a58b8030d2f9" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+payload reduce (  
+        (ev, result=[]) -> (result ++ (ev.envDetails map {
+	EnvName: ev.envName,
+	IsProd: ev.prod,
+	Inteface: $.domain,
+	WorkerTypeName: $.workers."type".name,
+	WorkerTypeWeight: $.workers."type".weight,
+	WorkerTypeCpu: $.workers."type".cpu,
+	WorkerTypeMemory: $.workers."type".memory,
+	Amount: $.workers.amount,
+	TotalOrgWorkers: $.workers.totalOrgWorkers,
+	RemainingOrgWorkers: $.workers.remainingOrgWorkers,
+	LastUpdateTime: $.lastUpdateTime as DateTime {
+		unit : "milliseconds"
+	} as DateTime {
+		format : "yyyy-MM-dd'T'HH:mm"
+	},
+	FileName: $.fileName,
+	MuleVer: $.muleVersion.version,
+	MuleVer_support_EndBy: $.muleVersion.endOfSupportDate as DateTime {
+		unit : "milliseconds"
+	} as Date,
+	Region: $.region,
+	PersistentQueues: $.persistentQueues,
+	MonitoringEnabled: $.monitoringEnabled,
+	StaticIPsEnabled: $.staticIPsEnabled,
+	//IPAddresses: $.ipAddresses joinBy "|",
+	BinaryFileName: $.fileName,
+	Status: $.status,
+	DeploymentUpdateStatus: $.deploymentUpdateStatus,
+	DeploymentErrorMessage: ($.deploymentErrorMessage default "") replace "," with "",
+	
+}))
+    )
+
+]]></ee:set-payload>
+					
+</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="attNm" ><![CDATA[%dw 2.0
+output text/plain
+---
+p('reportName')++ "_" ++ ((now() >> "EST") as String {format: "dd-MM-yyyy-HH:mm"}) ++ "." ++ p('fileFormat.csv')]]></ee:set-variable>
+					</ee:variables>
+				
+</ee:transform>
+			
+</when>
+			<when expression="#[vars.globalProperties.outputFormat == p('fileFormat.json')]">
+				<ee:transform doc:name="Transform to json" doc:id="b4176f19-a245-4e1c-8c3a-333965dd932e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	env_name: $.envName,
+	is_prod: $.prod,
+	env_details: $.envDetails map {
+		inteface: $.domain,
+		worker_type_name: $.workers."type".name,
+		worker_type_weight: $.workers."type".weight,
+		worker_type_cpu: $.workers."type".cpu,
+		worker_type_memory: $.workers."type".memory,
+		amount: $.workers.amount,
+		total_org_workers: $.workers.totalOrgWorkers,
+		remaining_org_workers: $.workers.remainingOrgWorkers,
+		last_update_time: $.lastUpdateTime as DateTime {
+			unit : "milliseconds"
+		} as DateTime {
+			format : "yyyy-MM-dd'T'HH:mm"
+		},
+		file_name: $.fileName,
+		mule_ver: $.muleVersion.version,
+		mule_ver_support_endby: $.muleVersion.endOfSupportDate as DateTime {
+			unit : "milliseconds"
+		} as Date,
+		region: $.region,
+		persistent_queues: $.persistentQueues,
+		monitoring_enabled: $.monitoringEnabled,
+		static_ips_enabled: $.staticIPsEnabled,
+		//ip_addresses: $.ipAddresses,
+		binary_file_name: $.fileName,
+		status: $.status,
+		deployment_update_status: $.deploymentUpdateStatus,
+		deployment_error_message: $.deploymentErrorMessage,
+	}
+}  ]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="attNm" ><![CDATA[%dw 2.0
+output text/plain
+---
+p('reportName')++ "_" ++ ((now() >> "EST") as String {format: "dd-MM-yyyy-HH:mm"}) ++ "." ++ p('fileFormat.json')]]></ee:set-variable>
+					</ee:variables>
+				
+</ee:transform>
+			</when>
+			<when expression="#[vars.globalProperties.outputFormat == p('fileFormat.xml')]">
+				<ee:transform doc:name="Transform to xml" doc:id="1003bc1a-ab25-4a43-95f5-8f2b890c1583" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+Env: {
+	Envs: payload map {
+		Env_Name: $.envName,
+		IS_Prod: $.prod,
+		Env_Details: $.envDetails map {
+			Inteface: $.domain,
+			Worker_Type_Name: $.workers."type".name,
+			Worker_Type_Weight: $.workers."type".weight,
+			Worker_Type_Cpu: $.workers."type".cpu,
+			Worker_Type_Memory: $.workers."type".memory,
+			Amount: $.workers.amount,
+			Total_Org_Workers: $.totalOrgWorkers,
+			Remaining_Org_Workers: $.remainingOrgWorkers,
+			Last_Update_Time: $.lastUpdateTime as DateTime {
+				unit : "milliseconds"
+			} as DateTime {
+				format : "yyyy-MM-dd'T'HH:mm"
+			},
+			File_Name: $.fileName,
+			Mule_Ver: $.muleVersion.version,
+			Mule_Ver_Support_EndBy: $.muleVersion.endOfSupportDate as DateTime {
+				unit : "milliseconds"
+			} as Date,
+			Region: $.region,
+			Persistent_Queues: $.persistentQueues,
+			Monitoring_Enabled: $.monitoringEnabled,
+			Static_IPs_Enabled: $.staticIPsEnabled,
+			//IP_Addresses: $.ipAddresses joinBy "|",
+			Binary_File_Name: $.fileName,
+			Status: $.status,
+			Deployment_Update_Status: $.deploymentUpdateStatus,
+			Deployment_Error_Message: $.deploymentErrorMessage,
+		}
+	}
+}
+]]></ee:set-payload>
+
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="attNm" ><![CDATA[%dw 2.0
+output text/plain
+---
+p('reportName')++ "_" ++ ((now() >> "EST") as String {format: "dd-MM-yyyy-HH:mm"}) ++ "." ++ p('fileFormat.xml')]]></ee:set-variable>
+					</ee:variables>
+				
+</ee:transform>
+			</when>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="80294f89-1651-43b0-a2e6-1b02a0b8221a" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of  output transformation "}'/>
+	
+</sub-flow>
+	
+</mule>

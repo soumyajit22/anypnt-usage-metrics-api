@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="generate-anypnt-access-token-subflow" doc:id="943007f1-48f6-4357-a51e-f7bdad873c50" >
+		<logger level="INFO" doc:name="Logger" doc:id="52c93955-061a-4090-ac6c-f7018f83a1b0" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start of retriving anypoint access token "}'/>
+		<until-successful maxRetries="${auth.untilSuccessful.maxRetries}" doc:name="Until Successful" doc:id="97e1604f-0c0b-4f4d-af14-e16ebe2d6e09" millisBetweenRetries="${auth.untilSuccessful.millsBetweenRetries}">
+			<http:request method="POST" doc:name="retrieve user access token" doc:id="96092af2-c49b-49a5-85ae-93decdb3051d" config-ref="HTTPRequestconfigurationAntpnt" path="/accounts/login">
+			<http:body><![CDATA[#[%dw 2.0 
+output application/json
+---
+    
+{	
+	username : vars.globalProperties.anypointUser,
+    password : vars.globalProperties.anypointPassword
+}]]]></http:body>
+		</http:request>
+		</until-successful>
+		<logger level="INFO" doc:name="Logger" doc:id="86d4da09-7d57-412e-9fa1-bae0dbad7d98" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of retriving anypoint access token "}'/>
+	</sub-flow>
+</mule>

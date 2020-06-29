@@ -1,0 +1,68 @@
+#%RAML 1.0
+title: Anypnt Usage Metrics
+version: v1.0
+protocols: [ HTTPS ]
+baseUri: http://host/api/{version}/
+
+mediaType: [application/json,application/XML,application/csv]
+
+traits:
+  credentials: !include /traits/credentials-trait.raml
+  output-format : !include /traits/output-trait.raml
+
+/platform-usage-metrics:
+  description: Retrieves information about all  application deployed across organization
+  get:
+   is: [credentials,output-format]
+   responses:
+     200:
+       body:
+        application/json:
+          example: !include /examples/platform-usage-metrics-examples.raml
+  /envs/list:
+      description: Retrieves list of environment in a organization
+      get:
+       is: [credentials]
+       responses:
+        200:
+         body:
+          application/json:
+           example: !include /examples/env-list-examples.raml     
+  /envs/{envName}:
+    description: Retrieves information about all the application deployed in a specific environment
+    get:
+     is: [credentials,output-format]
+     responses:
+       200:
+        body:
+         application/json:
+          example: !include /examples/platform-usage-metrics-examples.raml
+      
+    /vcores/count:
+      description: Retrieves total vcores in use in a specific environment
+      get:
+       is: [credentials]
+       responses:
+        200:
+          body:
+            application/json:
+             examples: !include /examples/vcores-examples.raml        
+    /active-runtime-vers:
+      description: Retrieves all distinct versions in use in a specific environment
+      get:
+       is: [credentials]
+       responses:
+        200:
+          body:
+            application/json:
+             example: !include /examples/runtime-examples.raml 
+             
+  /active-runtime-vers:
+    description: Retrieves all distinct versions in use across organization
+    get:
+     is: [credentials]
+     responses:
+      200:
+        body:
+          application/json:
+            example: !include /examples/runtime-examples.raml

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<flow name="anypnt-usage-metrics-endpoint-flow" doc:id="81a1be82-878a-4d3e-9aca-959a39605428" >
+		<scheduler doc:name="Scheduler" doc:id="cf958efa-58f0-4e9e-8de1-61d3ffc9ac74" >
+			<scheduling-strategy >
+				<cron expression="${anypnt.usage.metrics}" />
+			</scheduling-strategy>
+		</scheduler>
+		<ee:transform doc:name="global variables" doc:id="dd474a20-0856-4fa6-b6ce-acfeb9d07dfa" >
+			<ee:message >
+			</ee:message>
+			<ee:variables > 
+				<ee:set-variable variableName="globalProperties" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	endpointFlowName : mule.muleContext.componentLocator.componentLocations.rootContainerName[0],
+	uniqueTransactionId : correlationId,
+	outputFormat : p("fileFormat.csv"),
+	anypointUser : p("anypnt.userName"),
+	anypointPassword : p("anypnt.password"),
+	processingStrategy : p('processing.strategy.seq')
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="6382cf02-0abd-481f-a873-9ea498c1e4f0" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]","msg" :  "start of extracting metrics"}'/>
+		<flow-ref doc:name="retrieve-anypnt-usage-metrics-orchestrator-subflow" doc:id="bf642dc1-b80f-4c4f-9cad-bb0a35a190e1" name="retrieve-anypnt-usage-metrics-orchestrator-subflow"/>
+		<flow-ref doc:name="output-formater-subflow" doc:id="57532371-76c8-4422-9c89-0d8db47745c6" name="output-formater-subflow" />
+		<logger level="INFO" doc:name="Logger" doc:id="2f5c14ea-fa4b-477e-92ce-fe72aae8e1d3" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]","msg" :  "Database load to be inserted"}'/>
+		<logger level="INFO" doc:name="Logger" doc:id="b6b4e12e-0f35-420f-91f9-0fde1c70be26" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]","msg" :  "#[payload]"}'/>
+		<logger level="INFO" doc:name="Logger" doc:id="65ed1cc5-2c40-48c0-95a7-d131dcbeeadc" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of extracting metrics"}'/>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="c688ce34-fe19-4a26-aed5-230469296969" >
+				<flow-ref doc:name="email-subflow" doc:id="fc7074c3-e9dd-4f86-b896-c7c9ba00f68a" name="email-subflow"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+</mule>

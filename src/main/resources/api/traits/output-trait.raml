@@ -1,0 +1,12 @@
+#%RAML 1.0 Trait
+queryParameters:
+  responseFormat:
+    required: false
+    default: json
+    type: string
+    enum: [csv,json,xml]
+  responseByEmail:
+    description: Response will be send via email asynchronous 
+    required: false
+    default: false
+    type: boolean  

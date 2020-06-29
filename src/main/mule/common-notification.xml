@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+	
+	<sub-flow name="email-subflow" doc:id="ddcf2d9f-a935-4360-8e32-2f902ba7d1fb" >
+		<async doc:name="Async" doc:id="53891b14-ceb7-4586-b803-e541fd8aa78a" > 
+			<choice doc:name="Notification Enabled" doc:id="074be860-65d3-4fcd-b855-76c025a1f780" >
+				<when expression="#[not (vars.globalProperties.isNotificationEnable)]">
+					<logger level="DEBUG" doc:name="Logger" doc:id="2d652e9c-6603-4669-998b-3315ce7991cf" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]","correaltionId": "#[vars.globalProperties.correlationId]" , "msg" :  "Notification is dissabled"}'/>
+				</when>
+				<otherwise >
+					<try doc:name="Try" doc:id="ec860245-6b86-4ee4-a57f-883dc00100a2">
+			<ee:transform doc:name="Transform email content" doc:id="966fa482-dcca-4f16-a3c0-1d49259182f4">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+var  uniqueTransactionId =  if (isBlank( vars.globalProperties.uniqueTransactionId )) correlationId  else  vars.globalProperties.uniqueTransactionId 
+var  identifier =  if (isBlank( vars.globalProperties.correlationId )) ""  else  vars.globalProperties.correlationId
+output application/java
+---
+"Timestamp : " ++  now() as String ++ "\n\r" ++ 
+"BusinessId : The search parameters were " ++ uniqueTransactionId ++ " identifier " ++ identifier ++ "\n\r" ++ 
+"Status : " ++ error.errorType.identifier default "" ++ "\n\r" ++ 
+"Flow Name : " ++ (vars.globalProperties.endpointFlowName default "") ++ "\n\r" ++ 
+"Host Name : " ++ server.host default "" ++ "\n\r" ++ 
+"Error Text : " ++ error.description default ""]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<set-variable value="#[p('errorEmail.to') splitBy &quot;,&quot;]" doc:name="email to" doc:id="ddf42f0f-befc-4cbf-abb6-67808eb5c0c1" variableName="to" />
+						<email:send doc:name="Send alert" doc:id="5bc56abf-1921-4850-9689-abf02119814d" config-ref="EmailSMTP" fromAddress="${errorEmail.from}" subject="${errorEmail.subject}" toAddresses="#[vars.to]">
+				<email:body contentType="text/plain" />
+			</email:send>
+			<error-handler>
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d8f2193a-1a7c-4b86-9332-571e02e606ca">
+					<logger level="ERROR" doc:name="Logger" doc:id="36334849-180f-45b3-b060-b75c04b458a5" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]","correaltionId":  "msg" : "Error occured in sending email alert, Error Message #[error.description]"}' />
+				</on-error-continue>
+			</error-handler>
+		</try>
+				</otherwise>
+			</choice>
+		</async>
+	</sub-flow>
+	
+	</mule>

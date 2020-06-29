@@ -1,0 +1,93 @@
+#%RAML 1.0 NamedExample
+-
+  env_name: dev
+  is_prod: N
+  env_details:
+   -
+    inteface: test001-dev
+    status: STARTED
+    worker_type_name : Micro
+    worker_type_weight: 
+    worker_type_cpu: 0.1 vCores
+    worker_type_memory : 500 MB memory
+    amount : 1
+    last_update_time : 2020-06-06T03:52
+    mule_ver : 4.2.2
+    mule_ver_support_endby : 2021-05-03
+    region : us-east-2
+    persistent_queues : false
+    monitoring_enabled : true
+    static_ips_enabled: false
+    ip_addresses:
+      - 
+       77.22.33.45
+      -
+       33.32.22.24
+    binary_file_name : testtimeout-1.0.0-SNAPSHOT-mule-application.jar
+   -
+    inteface: test002-dev
+    status: STOPPED
+    worker_type_name : Micro
+    worker_type_weight: 
+    worker_type_cpu: 0.1 vCores
+    worker_type_memory : 500 MB memory
+    amount : 1
+    last_update_time : 2020-06-06T03:52
+    mule_ver : 4.2.2
+    mule_ver_support_endby : 2021-05-03
+    region : us-east-2
+    persistent_queues : false
+    monitoring_enabled : true
+    static_ips_enabled: false
+    ip_addresses:
+      - 
+        71.22.33.45
+      -
+        31.32.22.24
+    binary_file_name : testtimeout-2.0.0-SNAPSHOT-mule-application.jar
+-
+  env_name: Prod
+  is_prod: Y
+  env_details:
+   -
+    inteface: test001-prod
+    status: STARTED
+    worker_type_name : Micro
+    worker_type_weight: 
+    worker_type_cpu: 0.1 vCores
+    worker_type_memory : 500 MB memory
+    amount : 2
+    last_update_time : 2020-06-06T03:52
+    mule_ver : 4.2.2
+    mule_ver_support_endby : 2021-05-03
+    region : us-east-2
+    persistent_queues : false
+    monitoring_enabled : true
+    static_ips_enabled: false
+    ip_addresses:
+      - 
+        72.22.33.45
+      -
+        32.32.22.24
+    binary_file_name : testtimeout-1.0.0-mule-application.jar
+   -
+    inteface: test002-prod
+    status: STARTED
+    worker_type_name : Micro
+    worker_type_weight: 
+    worker_type_cpu: 0.1 vCores
+    worker_type_memory : 500 MB memory
+    amount : 2
+    last_update_time : 2020-06-06T03:52
+    mule_ver : 4.2.2
+    mule_ver_support_endby : 2021-05-03
+    region : us-east-2
+    persistent_queues : false
+    monitoring_enabled : true
+    static_ips_enabled: false
+    ip_addresses:
+      - 
+       74.22.33.45
+      -
+       34.32.22.24
+    binary_file_name : testtimeout-2.0.0-mule-application.jar

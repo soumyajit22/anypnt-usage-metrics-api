@@ -1,0 +1,4 @@
+{
+  "minMuleVersion": "4.3.0",
+  "secureProperties": ["anypnt.password", "anypnt.userName","http.tls.key.password","http.tls.password"]
+}
