@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="anypnt-usage-metrics-main">
+        <http:listener path="/api/${version}/*" config-ref="anypnt-usage-metrics-httpListenerConfig" outputMimeType="multipart/form-data">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+		<apikit:router config-ref="anypnt-usage-metrics-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="anypnt-usage-metrics-console">
+        <http:listener path="/console/*" config-ref="anypnt-usage-metrics-httpListenerConfig">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="anypnt-usage-metrics-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\platform-usage-metrics:anypnt-usage-metrics-config">
+		<ee:transform doc:name="global Variables" doc:id="ae78b9cb-b7b9-4c4f-accf-57db3339b8fb">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="globalProperties"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.con'),
+	outputFormat : attributes.queryParams.'responseFormat',
+	responseByEmail : attributes.queryParams.'responseByEmail',
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password',
+	email :  attributes.headers.'x-email' 
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="main-orchestrator-subflow" doc:id="68557b4c-2517-4c0b-87bf-0d27c8d5a3bd" name="main-orchestrator-subflow" />
+    </flow>
+	<flow name="get:\platform-usage-metrics\envs\list:anypnt-usage-metrics-config">
+		<ee:transform doc:name="global Variables" doc:id="f845cae0-8939-42e0-874f-e3c3e603f86f" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="globalProperties" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics\envs\list",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.seq'),
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password',
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="retrieve-env-list-subflow" doc:id="0b3efcf0-04dc-4458-8dc9-6accc0ad3d6c" name="retrieve-env-list-subflow"/>
+    </flow>
+    <flow name="get:\platform-usage-metrics\envs\(envName):anypnt-usage-metrics-config">
+        <ee:transform doc:name="global Variables" doc:id="4e6ac575-4f64-422f-a17d-db5f47e2e9d8">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="globalProperties"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics\envs\(envName)",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.seq'),
+	outputFormat : attributes.queryParams.'responseFormat',
+	responseByEmail : attributes.queryParams.'responseByEmail',
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password',
+	email :  attributes.headers.'x-email',
+	envName : attributes.uriParams.'envName'
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="main-orchestrator-subflow" doc:id="27979662-2fd7-441e-bbc0-3c90b6b9993c" name="main-orchestrator-subflow" />
+    </flow>
+    <flow name="get:\platform-usage-metrics\envs\(envName)\active-runtime-vers:anypnt-usage-metrics-config">
+		<ee:transform doc:name="global Variables" doc:id="40f16f7f-5bd4-43dd-aef4-4449ae42af2f" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="globalProperties" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics\envs\(envName)\active-runtime-vers",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.seq'),
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password',
+	envName : attributes.uriParams.'envName'
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="retrieve-active-runtime-version-subflow" doc:id="549cbe8c-f11c-4753-bb08-ee01c8d4c634" name="retrieve-active-runtime-version-subflow"/>
+    </flow>
+    <flow name="get:\platform-usage-metrics\envs\(envName)\vcores\count:anypnt-usage-metrics-config">
+        <ee:transform doc:name="global properties" doc:id="5971bd0e-7f53-4c47-a091-298061aa61a2">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="globalProperties"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics\envs\(envName)\vcores\count",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.seq'),
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password',
+	envName : attributes.uriParams.'envName'
+	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="retrieve-vcores-subflow" doc:id="b1330106-5706-4672-9fbd-73a6f5a76875" name="retrieve-vcores-subflow" />
+    </flow>
+	<flow name="get:\platform-usage-metrics\active-runtime-vers:anypnt-usage-metrics-config">
+        <ee:transform doc:name="global Variables" doc:id="10480946-89ca-4290-9ca9-67c0305b43df" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="globalProperties" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	   
+	endpointFlowName : "get:\platform-usage-metrics\active-runtime-vers",
+	uniqueTransactionId : correlationId,
+	isNotificationEnable : p('smtp.notification.enable') as Boolean default true,
+	processingStrategy : p('processing.strategy.con'),
+	anypointUser :  attributes.headers.'x-username',
+	anypointPassword :  attributes.headers.'x-password'	
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="retrieve-active-runtime-version-subflow" doc:id="a01b94de-bb4b-467e-abba-c4cdb388eb2a" name="retrieve-active-runtime-version-subflow"/>
+    </flow>
+</mule>

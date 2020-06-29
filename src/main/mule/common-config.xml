@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd 
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+		<http:listener-config
+		name="anypnt-usage-metrics-httpListenerConfig">
+		<http:listener-connection host="0.0.0.0"
+			port="${https.port}" protocol="HTTPS" 
+			connectionIdleTimeout="${http.listner.connection.idle.timeout}">
+			<tls:context>
+				<tls:key-store type="jks"
+					path="${http.tls.path}"
+					keyPassword="${http.tls.key.password}"
+					password="${http.tls.password}"
+					alias="${http.tls.alias}" />
+			</tls:context>
+		</http:listener-connection>
+		
+	</http:listener-config>
+	 <apikit:config name="anypnt-usage-metrics-config" api="api/anypnt-usage-metrics.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus"/>
+   
+	<http:request-config name="HTTPRequestconfigurationAntpnt" doc:name="HTTP Request configuration" doc:id="a7e40aa9-fa60-4393-adb1-a9563596566c" enableCookies="false">
+		<http:request-connection protocol="HTTPS" host="${anypnt.host}" port="${anypnt.port}" maxConnections="${http.max.connection}" connectionIdleTimeout="${http.connection.idle.timeout}" responseBufferSize="${http.response.buffer.size}" >
+			<reconnection >
+				<reconnect frequency="${http.retry.frequency}" count="${http.retry.attempts}" />
+			</reconnection>
+		</http:request-connection>
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="c29d7616-0ad3-45bc-ae3e-90fcbb48d382" file="properties/${mule.env}.properties" />
+	<configuration-properties doc:name="Configuration properties" doc:id="05794fab-72e1-41fc-b7e0-0a05deb92ef8" file="properties/messageconstant.properties" />
+		<email:smtp-config name="EmailSMTP"
+		doc:name="Email SMTP" doc:id="800e629e-db16-4000-8876-6f4bfa7f6f83">
+		<email:smtp-connection
+			host="${smtp.endpoint}" port="${smtp.port}"
+			connectionTimeout="${smtp.connectionTimeout}"
+			readTimeout="${smtp.readTimeout}"
+			writeTimeout="${smtp.writeTimeout}">
+			<reconnection>
+				<reconnect frequency="${smtp.retry.frequency}"
+					count="${smtp.retry.attempts}" />
+			</reconnection>
+			<email:properties>
+				<email:property key="mail.smtp.starttls.enable"
+					value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<vm:config name="VMConfig" doc:name="VM Config" doc:id="bb72c464-8cf7-4f94-a08a-b4af2b4e0b8f" >
+		<vm:queues >
+			<vm:queue queueName="${vmq.queue}" maxOutstandingMessages="1" />
+		</vm:queues>
+	</vm:config>
+	<global-property doc:name="Global Property" doc:id="cae76e76-2db6-4d71-b1d3-d416d079df00" name="mule.env" value="dev" />
+	
+
+</mule>

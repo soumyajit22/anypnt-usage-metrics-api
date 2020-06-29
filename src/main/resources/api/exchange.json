@@ -1,0 +1,6 @@
+{
+  "main": "anypnt-usage-metrics.raml",
+  "name": "Anypnt Usage Metrics",
+  "classifier": "raml",
+  "tags": []
+} 

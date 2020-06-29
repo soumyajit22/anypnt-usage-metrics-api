@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:aggregators="http://www.mulesoft.org/schema/mule/aggregators" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/aggregators http://www.mulesoft.org/schema/mule/aggregators/current/mule-aggregators.xsd">
+	
+	<sub-flow name="get-anypnt-env-details-subflow" doc:id="65af1a66-9743-41cc-9c26-a58a613de0a5" >
+		<logger level="INFO" doc:name="Logger" doc:id="7ce5fd48-bacd-4855-aa99-b6ff813c07ad" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start  of extracting anypoint environment details for environment "}'/>
+		<http:request method="GET" doc:name="retrieve details of each environment" doc:id="8b3dd37f-e526-4294-b77c-4a14e5c3ce23" config-ref="HTTPRequestconfigurationAntpnt" path="/cloudhub/api/v2/applications" responseTimeout="${http.requster.timeout.anypoint.envDetails}">
+			<http:body ><![CDATA[#[null]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"x-anypnt-org-id" : vars.orgId, 
+	"Authorization" : vars.accessToken,
+	"x-anypnt-env-id" : payload.envId
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="c5206de6-9fa7-4436-bac9-dc8d1cbc0d10" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of extracting anypoint environment details for environment "}'/>
+	</sub-flow>
+	<sub-flow name="get-anypnt-envs-list-subflow" doc:id="d2766631-0fb2-4951-9f58-c110ffa1cef6" >
+		<logger level="INFO" doc:name="Logger" doc:id="068a891f-a67c-4c13-baaa-0069cb1f3e7b" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start of extracting anypoint environment id list"}'/>
+		<http:request method="GET" doc:name="retrieve environment list" doc:id="05019e31-421b-4727-9ca4-c60e4e7e0532" config-ref="HTTPRequestconfigurationAntpnt" path="/accounts/api/organizations/{orgId}/environments">
+			<http:body ><![CDATA[#[null]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"orgId" : vars.orgId
+}]]]></http:uri-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="537dbd2f-c948-4757-9779-b4f707e0a398" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of extracting anypoint environment id list"}' />
+		<ee:transform doc:name="environment details" doc:id="3c0405b4-0339-45b8-804d-4359cebe8702" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="envList" ><![CDATA[%dw 2.0
+fun filterEnv(payload,envName) = if (envName != null and envName != "") payload.data filter $.name == envName else payload.data
+var payload = filterEnv(payload, vars.globalProperties.envName)
+output application/java
+---
+
+ payload map  {
+		envId: $.id,
+		envName: $.name,
+		prod: if($.isProduction == true) p('yes') else p('no')
+	}
+
+
+
+]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable value="#[sizeOf(vars.envList)]" doc:name="environment count" doc:id="37a36c92-2eaf-407d-aa9e-26e007140e3f" variableName="envCount"/>
+	</sub-flow>
+	<sub-flow name="get-anypnt-org-details-subflow" doc:id="b347c4f8-8e2c-4cd8-a19e-3808eb551c31" >
+		<logger level="INFO" doc:name="Logger" doc:id="f3d79977-70a9-41b0-a321-5d7b9c32f495" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "start of extracting anypoint org id "}'/>
+		<http:request method="GET" doc:name="retrieve org details" doc:id="855b1dc7-efea-4210-b4bc-7306559e8047" config-ref="HTTPRequestconfigurationAntpnt" path="/accounts/api/me">
+			<http:body ><![CDATA[#[null]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.accessToken
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="8421f899-d5fa-44d4-930b-d2b7937d4e1d" message='{"uniqueTransactionId": "#[vars.globalProperties.uniqueTransactionId]", "msg" :  "end of extracting anypoint org id "}'/>
+	</sub-flow>
+</mule>
